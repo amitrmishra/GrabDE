@@ -122,6 +122,8 @@ object GenerateDatasets {
 //      .orderBy('ratio.desc)
 //      .show(100)
 
+    tripsDf.cache()
+
     println(s"Trips: ${tripsDf.count}, Booking Requests: ${bookingRequestDf.count}, Drivers: ${driverPingDf.count}")
 
 
