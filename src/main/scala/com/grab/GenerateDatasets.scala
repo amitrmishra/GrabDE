@@ -10,20 +10,15 @@ object GenerateDatasets {
     val spark = getSparkSession
     import spark.implicits._
 
-    //  val tripsCsvFile = args(0)
-    val tripsCsvFile = "/Users/amitranjan/Documents/Grab-DE/green_tripdata_2016-01.csv"
-
-    //  val tripsCsvFile = args(1)
-    val weatherCsvFile = "/Users/amitranjan/Documents/Grab-DE/new_york_hourly_weather_data.csv"
-
-    //  val outputDataDir = args(2)
-    val outputDataDir = "/Users/amitranjan/Documents/Grab-DE/data"
-
+    val tripsCsvFile = if(args.length >= 1) args(0) else "/Users/amitranjan/Documents/Grab-DE/green_tripdata_2016-01.csv"
+    val weatherCsvFile = if(args.length >= 2) args(1) else "/Users/amitranjan/Documents/Grab-DE/new_york_hourly_weather_data.csv"
+    val outputDataDir = if(args.length >= 3) args(2) else "/Users/amitranjan/Documents/Grab-DE/data"
 
     def getGeohash = udf((lat: Double, lon: Double) => GeoHash.geoHashStringWithCharacterPrecision(lat, lon, 6))
+
     def getHour = udf((timeString: String) => {
       val hour = timeString.split(":")(0).toInt
-      if(timeString.split(" ")(1) == "AM") {
+      if(timeString.split(" ")(1).toUpperCase() == "AM") {
         if(hour == 12) hour - 12 else hour
       }
       else {
@@ -129,10 +124,10 @@ object GenerateDatasets {
     val rawWeatherDf = spark.read.format("csv").option("header", "true").load(weatherCsvFile)
     val weatherDf = rawWeatherDf.select(to_timestamp(concat($"date", lit(" "), getHour($"TimeEST")), "yyyy-MM-dd HH").cast("long").as("start_epoch"),
         (to_timestamp(concat($"date", lit(" "), getHour($"TimeEST")), "yyyy-MM-dd HH").cast("long") + lit(3599)).as("end_epoch"),
-        'TemperatureF.as("temperature"),
-      $"Dew PointF".as("dew_point"),
-      'Humidity.as("humidity"),
-      $"Wind SpeedMPH".as("wind_speed"),
+        'TemperatureF.cast("float").as("temperature"),
+      $"Dew PointF".cast("float").as("dew_point"),
+      'Humidity.cast("float").as("humidity"),
+      $"Wind SpeedMPH".cast("float").as("wind_speed"),
       'Conditions.as("condition"))
       .orderBy('start_epoch)
 
