@@ -1,0 +1,8 @@
+# Intellij files
+.idea
+
+# Logs directory
+logs
+
+# Target files
+target
