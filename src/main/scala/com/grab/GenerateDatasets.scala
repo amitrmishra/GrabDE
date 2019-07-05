@@ -10,9 +10,13 @@ object GenerateDatasets {
     val spark = getSparkSession
     import spark.implicits._
 
-    val tripsCsvFile = if(args.length >= 1) args(0) else "/Users/amitranjan/Documents/Grab-DE/green_tripdata_2016-01.csv"
-    val weatherCsvFile = if(args.length >= 2) args(1) else "/Users/amitranjan/Documents/Grab-DE/new_york_hourly_weather_data.csv"
-    val outputDataDir = if(args.length >= 3) args(2) else "/Users/amitranjan/Documents/Grab-DE/data"
+    println("#######   supplied args     #######")
+    args.foreach(println)
+    println("###################################")
+
+    val tripsCsvFile = if(args.length > 0) args(0) else "/Users/amitranjan/Documents/Grab-DE/green_tripdata_2016-01.csv"
+    val weatherCsvFile = if(args.length > 1) args(1) else "/Users/amitranjan/Documents/Grab-DE/new_york_hourly_weather_data.csv"
+    val outputDataDir = if(args.length > 2) args(2) else "/Users/amitranjan/Documents/Grab-DE/data"
 
     def getGeohash = udf((lat: Double, lon: Double) => GeoHash.geoHashStringWithCharacterPrecision(lat, lon, 6))
 
