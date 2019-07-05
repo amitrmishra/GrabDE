@@ -14,7 +14,7 @@ object GenerateDatasets {
     args.foreach(println)
     println("###################################")
 
-    val tripsCsvFile = if(args.length > 0) args(0) else "/Users/amitranjan/Documents/Grab-DE/green_tripdata_2016-01.csv"
+    val tripsCsvFile = if(args.length > 0) args(0) else "/Users/amitranjan/Documents/Grab-DE/yellow_tripdata_2016-01.csv"
     val weatherCsvFile = if(args.length > 1) args(1) else "/Users/amitranjan/Documents/Grab-DE/new_york_hourly_weather_data.csv"
     val outputDataDir = if(args.length > 2) args(2) else "/Users/amitranjan/Documents/Grab-DE/data"
 
@@ -33,15 +33,15 @@ object GenerateDatasets {
     val rawTripsDf = spark.read.format("csv").option("header", "true").load(tripsCsvFile)
 
     val tripsDf = rawTripsDf
-      .select(to_timestamp($"lpep_pickup_datetime", "yyyy-MM-dd HH:mm:ss").cast("long").as("pickup_epoch")
-      ,to_timestamp($"Lpep_dropoff_datetime", "yyyy-MM-dd HH:mm:ss").cast("long").as("dropoff_epoch")
-      ,$"Pickup_latitude".cast("double").as("pickup_latitude")
-      ,$"Pickup_longitude".cast("double").as("pickup_longitude")
-      ,$"Dropoff_latitude".cast("double").as("dropoff_latitude")
-      ,$"Dropoff_longitude".cast("double").as("dropoff_longitude")
-      ,$"Trip_distance".cast("float").as("trip_distance")
-      ,$"Fare_amount".cast("float").as("fare_amounnt")
-      ,$"Total_amount".cast("float").as("total_amount"))
+      .select(to_timestamp($"tpep_pickup_datetime", "yyyy-MM-dd HH:mm:ss").cast("long").as("pickup_epoch")
+      ,to_timestamp($"tpep_dropoff_datetime", "yyyy-MM-dd HH:mm:ss").cast("long").as("dropoff_epoch")
+      ,$"pickup_latitude".cast("double")
+      ,$"pickup_longitude".cast("double")
+      ,$"dropoff_latitude".cast("double")
+      ,$"dropoff_longitude".cast("double")
+      ,$"trip_distance".cast("float")
+      ,$"fare_amount".cast("float")
+      ,$"total_amount".cast("float"))
       .withColumn("pickup_geohash", getGeohash($"pickup_latitude", $"pickup_longitude"))
       .withColumn("dropoff_geohash", getGeohash($"dropoff_latitude", $"dropoff_longitude"))
       .orderBy($"pickup_epoch")
