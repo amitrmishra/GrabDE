@@ -156,5 +156,5 @@ object GenerateDatasets {
     // Avoid generating compressed output, as it may be used outside spark
     spark.sparkContext.hadoopConfiguration.set("mapred.output.compress", "false")
     spark
-  }
+  } 
 }
