@@ -152,6 +152,9 @@ object GenerateDatasets {
       .appName(this.getClass.getSimpleName)
       .config(sparkConf)
       .getOrCreate()
+
+    // Avoid generating compressed output, as it may be used outside spark
+    spark.sparkContext.hadoopConfiguration.set("mapred.output.compress", "false")
     spark
   }
 }
