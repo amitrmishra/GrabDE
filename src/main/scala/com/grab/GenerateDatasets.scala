@@ -18,6 +18,8 @@ object GenerateDatasets {
     val weatherCsvFile = if(args.length > 1) args(1) else "/Users/amitranjan/Documents/Grab-DE/new_york_hourly_weather_data.csv"
     val outputDataDir = if(args.length > 2) args(2) else "/Users/amitranjan/Documents/Grab-DE/data"
 
+    def getGeohash = udf((lat: Double, lon: Double) => GeoHash.geoHashStringWithCharacterPrecision(lat, lon, 6))
+
     def getHour = udf((timeString: String) => {
       val hour = timeString.split(":")(0).toInt
       if(timeString.split(" ")(1).toUpperCase() == "AM") {
@@ -40,36 +42,35 @@ object GenerateDatasets {
       ,$"trip_distance".cast("float")
       ,$"fare_amount".cast("float")
       ,$"total_amount".cast("float"))
-      // Do not push it here. Rather calculate it during analysis phase
-      //.withColumn("pickup_geohash", getGeohash($"pickup_latitude", $"pickup_longitude"))
-      //.withColumn("dropoff_geohash", getGeohash($"dropoff_latitude", $"dropoff_longitude"))
-      //.filter('dropoff_epoch > 'pickup_epoch)
-      //.filter('pickup_latitude.notEqual(0.0) || 'pickup_longitude.notEqual(0.0))
-      //.withColumn("average_speed", 'trip_distance / ('dropoff_epoch - 'pickup_epoch))
       .orderBy($"pickup_epoch")
 
     val bookingRequestDf = tripsDf
       .select('pickup_epoch.as("booking_time_epoch"),
         'pickup_latitude.as("booking_latitude"),
         'pickup_longitude.as("booking_longitude"),
+        lit(getGeohash('pickup_latitude, 'pickup_longitude)).as("booking_geohash"),
         rand().as("select_prob"))
       .union(tripsDf.select('dropoff_epoch.as("booking_time_epoch"),
         'pickup_latitude.as("booking_latitude"),
         'pickup_longitude.as("booking_longitude"),
+        lit(getGeohash('pickup_latitude, 'pickup_longitude)).as("booking_geohash"),
         rand().as("select_prob")))
       .union(tripsDf.select('pickup_epoch.as("booking_time_epoch"),
         'dropoff_latitude.as("booking_latitude"),
         'dropoff_longitude.as("booking_longitude"),
+        lit(getGeohash('dropoff_latitude, 'dropoff_longitude)).as("booking_geohash"),
         rand().as("select_prob")))
       .union(tripsDf.select('dropoff_epoch.as("booking_time_epoch"),
         'dropoff_latitude.as("booking_latitude"),
         'dropoff_longitude.as("booking_longitude"),
+        lit(getGeohash('dropoff_latitude, 'dropoff_longitude)).as("booking_geohash"),
         rand().as("select_prob")))
       .filter('select_prob > 0.6)
       .select(concat(lit("B"), ('select_prob * 1000000000).cast("long")).as("booking_id"),
         'booking_time_epoch,
         'booking_latitude,
-        'booking_longitude
+        'booking_longitude,
+        'booking_geohash
       )
       .orderBy('booking_time_epoch)
 
@@ -77,44 +78,26 @@ object GenerateDatasets {
       .select('pickup_epoch.as("driver_last_ping"),
         'pickup_latitude.as("driver_latitude"),
         'pickup_longitude.as("driver_longitude"),
+        lit(getGeohash('pickup_latitude, 'pickup_longitude)).as("driver_geohash"),
         rand().as("select_prob"))
       .union(tripsDf.select('dropoff_epoch.as("driver_last_ping"),
         'dropoff_latitude.as("driver_latitude"),
         'dropoff_longitude.as("driver_longitude"),
+        lit(getGeohash('dropoff_latitude, 'dropoff_longitude)).as("driver_geohash"),
         rand().as("select_prob")))
       .union(tripsDf.select('pickup_epoch.as("driver_last_ping"),
         'dropoff_latitude.as("driver_latitude"),
         'dropoff_longitude.as("driver_longitude"),
+        lit(getGeohash('dropoff_latitude, 'dropoff_longitude)).as("driver_geohash"),
         rand().as("select_prob")))
       .filter('select_prob > 0.5)
       .select(concat(lit("D"), ('select_prob * 1000000000).cast("long")).as("driver_id"),
         'driver_last_ping,
         'driver_latitude,
         'driver_longitude,
+        'driver_geohash,
         when('select_prob > 0.5, 1).otherwise(0).as("driver_available"))
       .orderBy('driver_last_ping)
-
-    // REALTIME
-    // In the last 5 mins, number of bookings requested per geohash
-    // Number of unique available driver pings per geohash
-    // Get top 100 and bottom 100 such entries
-
-    // BATCH
-    // Same as above for the range (lower bound) and upper bound
-
-//    val aggregatedBookingsDf = bookingRequestDf.groupBy('booking_geohash)
-//      .agg(count("*").as("num_bookings"))
-//
-//    val availableDriversDf = driverPingDf.filter('driver_available === 1)
-//      .groupBy('driver_geohash)
-//      .agg(countDistinct('driver_id).as("num_active_drivers"))
-//
-//    val ratioDf = aggregatedBookingsDf
-//      .join(availableDriversDf, 'booking_geohash === 'driver_geohash)
-//        .where('booking_time_epoch.between('driver_last_ping, 'driver_last_ping.plus(5)))
-//    ratioDf.select('booking_geohash, 'num_bookings, 'num_active_drivers, ('num_bookings/'num_active_drivers.cast("double")).as("ratio"))
-//      .orderBy('ratio.desc)
-//      .show(100)
 
     tripsDf.cache()
 
@@ -130,13 +113,13 @@ object GenerateDatasets {
       'Conditions.as("condition"))
       .orderBy('start_epoch)
 
-    tripsDf.repartition(1).write.json(s"$outputDataDir/trips")
-    bookingRequestDf.repartition(1).write.json(s"$outputDataDir/booking-requests")
-    driverPingDf.repartition(1).write.json(s"$outputDataDir/driver-ping")
+    tripsDf.repartition(1).write.mode("overwrite").json(s"$outputDataDir/trips")
+    bookingRequestDf.repartition(1).write.mode("overwrite").json(s"$outputDataDir/booking-requests")
+    driverPingDf.repartition(1).write.mode("overwrite").json(s"$outputDataDir/driver-ping")
 
     tripsDf.unpersist()
 
-    weatherDf.repartition(1).write.json(s"$outputDataDir/weather")
+    weatherDf.repartition(1).write.mode("overwrite").json(s"$outputDataDir/weather")
   }
 
   def getSparkSession(): SparkSession = {
