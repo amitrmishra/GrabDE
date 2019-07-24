@@ -21,6 +21,7 @@ object DataAnalysis {
     val logger = Logger.getLogger(this.getClass.getName)
     logger.setLevel(Level.ERROR)
     Logger.getLogger("org").setLevel(Level.ERROR)
+    Logger.getRootLogger.setLevel(Level.WARN)
 
     val sparkConf = new SparkConf()
     sparkConf.set("spark.es.nodes", "localhost")
@@ -77,15 +78,6 @@ object DataAnalysis {
 
     println("Creating weatherDf")
     val weatherDf = Utils.getDfFromKafka(spark)("weather", Schemas.SCHEMA_WEATHER)
-        .select(
-          $"timestamp".cast("long").minus($"timestamp".cast("long").mod(3600)).multiply(1000).as("start_ts"),
-          $"timestamp".cast("long").plus(lit(3600).minus($"timestamp".cast("long").mod(3600))).multiply(1000).as("end_ts"),
-          $"data.condition".as("condition"),
-          $"data.dew_point".as("dew_point"),
-          $"data.humidity".as("humidity"),
-          $"data.temperature".as("temperature"),
-          $"data.wind_speed".as("wind_speed")
-        )
 
     println("Starting the streaming query...")
     val surgeRatioQuery: StreamingQuery = surgeDf
@@ -152,10 +144,17 @@ class WeatherWriter extends ((DataFrame, Long) => Unit) {
     data.sparkSession.sparkContext.setLogLevel("WARN")
     import data.sparkSession.implicits._
     println(s"################  ${new Date}: [ WeatherWriter ] Started ################ ")
-    val surgeData = data.groupBy($"timestamp".cast("long").plus(lit(10).minus($"timestamp".cast("long").mod(10))).multiply(1000).as("reporting_ts"), $"geohash")
-      .agg(countDistinct($"booking_id").as("num_requests"), countDistinct($"driver_id").as("num_drivers"))
+    val weatherData = data.select(
+      $"timestamp".cast("long").minus($"timestamp".cast("long").mod(3600)).multiply(1000).as("start_ts"),
+      $"timestamp".cast("long").plus(lit(3600).minus($"timestamp".cast("long").mod(3600))).multiply(1000).as("end_ts"),
+      $"data.condition".as("condition"),
+      $"data.dew_point".as("dew_point"),
+      $"data.humidity".as("humidity"),
+      $"data.temperature".as("temperature"),
+      $"data.wind_speed".as("wind_speed")
+    )
 
-    surgeData.saveToPhoenix(Map("table" -> "grab_weather", "zkUrl" -> Utils.PHOENIX_ZK_URL))
-    println("[ SurgeWriter ] Saved to phoenix")
+    weatherData.saveToPhoenix(Map("table" -> "grab_weather", "zkUrl" -> Utils.PHOENIX_ZK_URL))
+    println("[ WeatherWriter ] Saved to phoenix")
   }
 }
